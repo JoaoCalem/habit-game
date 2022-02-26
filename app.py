@@ -3,6 +3,8 @@ import json
 import datetime as dt
 import pandas as pd
 import psycopg2
+import matplotlib.pyplot as plt
+import seaborn as sns
 
 @st.cache(allow_output_mutation=True, hash_funcs={"_thread.RLock": lambda _: None})
 def sql_connection():
@@ -25,13 +27,13 @@ conn = sql_connection()
 
 cur = conn.cursor()
     
-weekly_points = 70
+weekly_points = 100
     
 cur.execute("SELECT * FROM points")
 points = cur.fetchone()[1]
 
 cur.execute("SELECT * FROM habits")
-habits = {r[0]: {"name": r[1], "goal":r[2], "type":r[3]} for r in cur.fetchall()}
+habits = {r[0]: {"name": r[1], "goal":r[2], "daily_goal":r[4], "type":r[3]} for r in cur.fetchall()}
 
 cur.execute("SELECT * FROM rewards")
 rewards = {r[0]: {"name": r[1],"points":r[2], "type":r[3]} for r in cur.fetchall()}
@@ -52,7 +54,7 @@ def trash():
 
 st.write("## Points:")
 
-st.write(f'### {points}')
+st.write(f'### {round(points,2)}')
 
 if habits:
     st.write("## Habits:")
@@ -66,7 +68,10 @@ for key,habit in habits_st.items():
         cur.execute(f"SELECT * FROM counts WHERE habit_id = {key} AND date = '{day_datetime}'")
         if not cur.fetchone():
             cur.execute(f"INSERT INTO counts (habit_id, date, count) VALUES ({key}, '{day_datetime}', 0)")
-
+    
+    daily_goal_points = 0
+    weekly_goal_points = 0
+    
     if habits[key]["type"] == "Time Based":
         count_type = "hours "
 
@@ -75,47 +80,96 @@ for key,habit in habits_st.items():
         hours = habit["main"][0].number_input('Hours', 0,key=f'{habits[key]["name"]} hours')
 
         mins = habit["main"][1].number_input('Minutes', 0,key=f'{habits[key]["name"]} mins', step=5)
-
+        
+        cur.execute(f"SELECT c.date, c.count/60 FROM counts c WHERE date >= '{start}' AND habit_id={key}")
+        temp_counts = {str(i[0]):float(i[1]) for i in cur.fetchall()}
+        count = sum(temp_counts.values())
+        
         habit["main"][2].write("# ")
         if habit["main"][2].button('Add Time',key=f'{habits[key]["name"]} add'):
-            # print is visible in the server output, not in the page
-            cur.execute(f"SELECT count FROM counts WHERE habit_id = {key} AND date = '{dt.date.today()}'")
-            temp = float(cur.fetchone()[0]) + int(mins) + 60*int(hours)
+            
+            count_today = temp_counts[str(dt.date.today())]
+            temp = count_today*60 + int(mins) + 60*int(hours)
+            
             cur.execute(f"""UPDATE counts SET count={temp}
                 WHERE habit_id = {key} AND date = '{dt.date.today()}'""")
+            
+            daily_goal = float(habits[key]["daily_goal"])
+            if daily_goal:
+                if daily_goal > count_today and daily_goal <= temp/60:
+                    daily_goal_points = weekly_points/(len(habits)*28)
+                    
+                normal_modifier = 2
+            else:
+                normal_modifier = 4/3
+           
+            weekly_goal = float(habits[key]["goal"])
+            passed_weekly = all([
+                weekly_goal > count,
+                weekly_goal <= count + int(mins)/60 + int(hours)
+            ])
+            
+            if weekly_goal > count and weekly_goal <= count + int(mins)/60 + int(hours):
+                weekly_goal_points = weekly_points/(len(habits)*4)
             
             cur.execute(f"SELECT total FROM points")
             temp = float(cur.fetchone()[0]) + weekly_points*(int(mins) + 60*int(hours))\
-                /(len(habits)*60*float(habits[key]["goal"]))
+                /(len(habits)*60*float(habits[key]["goal"])*normal_modifier)\
+                + daily_goal_points + weekly_goal_points
+                
             cur.execute(f"UPDATE points SET total={temp}")
             
             save()
-        cur.execute(f"SELECT c.date, c.count/60 FROM counts c WHERE date >= '{start}' AND habit_id={key}")
 
     else:
         count_type = ""
+        
+        cur.execute(f"SELECT c.date, c.count FROM counts c WHERE date >= '{start}' AND habit_id={key}")
+        temp_counts = {str(i[0]):float(i[1]) for i in cur.fetchall()}
+        count = sum(temp_counts.values())
 
         if habit["expander"].button('+',key=f'{habits[key]["name"]} add'):
-            cur.execute(f"SELECT count FROM counts WHERE habit_id = {key} AND date = '{dt.date.today()}'")
-            temp = float(cur.fetchone()[0]) + 1
-            cur.execute(f"""UPDATE counts SET count={temp}
+            
+            count_today = temp_counts[str(dt.date.today())]
+            cur.execute(f"""UPDATE counts SET count={count_today+1}
                 WHERE habit_id = {key} AND date = '{dt.date.today()}'""")
             
+            daily_goal = float(habits[key]["daily_goal"])
+            if daily_goal:
+                if daily_goal > count_today and daily_goal <= count_today + 1:
+                    daily_goal_points = weekly_points/(len(habits)*28)
+
+                normal_modifier = 2
+            else:
+                normal_modifier = 4/3
+           
+            weekly_goal = float(habits[key]["goal"])
+            if weekly_goal > count and weekly_goal <= count + 1:
+                weekly_goal_points = weekly_points/(len(habits)*4)
+            
             cur.execute(f"SELECT total FROM points")
-            temp = float(cur.fetchone()[0]) + weekly_points/(len(habits)*float(habits[key]["goal"]))
+            temp = float(cur.fetchone()[0]) + weekly_points/(len(habits)*weekly_goal*normal_modifier)\
+                + daily_goal_points + weekly_goal_points
+                
             cur.execute(f"UPDATE points SET total={temp}")
             
             save()
-            
-        cur.execute(f"SELECT c.date, c.count FROM counts c WHERE date >= '{start}' AND habit_id={key}")
     
-    temp_counts = {str(i[0]):float(i[1]) for i in cur.fetchall()}
+    fig, ax = plt.subplots()
+    fig.set_figheight(2)
+    df = pd.DataFrame(temp_counts.values(),index=temp_counts.keys(), columns=["Count"]).sort_index()
+    sns.barplot(data=df,x=["Mon","Tue","Wed","Thu","Fri","Sat","Sun"],y="Count",ax=ax, color="black")
+    ylim_min = float(habits[key]["daily_goal"])*1.3
+    if ax.get_ylim()[1] < ylim_min:
+        ax.set_ylim([0,ylim_min])
     
-    count = sum(temp_counts.values())
+    ax2 = plt.twinx()
+    ax2.plot(["Mon","Tue","Wed","Thu","Fri","Sat","Sun"],[habits[key]["daily_goal"]]*7)
+    ax2.set_ylim(ax.get_ylim())
 
-    habit["expander"].bar_chart(pd.DataFrame(temp_counts.values(),index=temp_counts.keys()))
+    habit["expander"].pyplot(fig)
 
-    habit["expander"].write(f'### {count} out of {habits[key]["goal"]} {count_type}complete this week')
+    habit["expander"].write(f'### {round(count,2)} out of {habits[key]["goal"]} {count_type}complete this week')
 
     habit["expander"].write("# ")
     habit["end_columns"] = habit["expander"].columns([4,1])
