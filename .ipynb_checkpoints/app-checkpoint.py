@@ -95,34 +95,21 @@ for key,habit in habits_st.items():
                 WHERE habit_id = {key} AND date = '{dt.date.today()}'""")
             
             daily_goal = float(habits[key]["daily_goal"])
-            passed_daily = all([
-                daily_goal,
-                daily_goal > count_today,
-                daily_goal <= temp/60
-            ])
-            
-            if passed_daily:
-                daily_goal_points = weekly_points/(len(habits)*28)
-                print(daily_goal_points)
-            
             if daily_goal:
+                if daily_goal > count_today and daily_goal <= temp/60:
+                    daily_goal_points = weekly_points/(len(habits)*28)
+                    
                 normal_modifier = 2
             else:
                 normal_modifier = 4/3
            
             weekly_goal = float(habits[key]["goal"])
-            passed_weekly = all([
-                weekly_goal > count,
-                weekly_goal <= count + int(mins)/60 + int(hours)
-            ])
-            
-            if passed_weekly:
+            if weekly_goal > count and weekly_goal <= count + int(mins)/60 + int(hours):
                 weekly_goal_points = weekly_points/(len(habits)*4)
             
             cur.execute(f"SELECT total FROM points")
-            temp = float(cur.fetchone()[0]) + weekly_points*(int(mins) + 60*int(hours))\
-                /(len(habits)*60*float(habits[key]["goal"])*normal_modifier)\
-                + daily_goal_points + weekly_goal_points
+            temp = float(cur.fetchone()[0]) + weekly_points*(int(mins)/60 + int(hours))\
+                /(len(habits)*weekly_goal*normal_modifier) + daily_goal_points + weekly_goal_points
                 
             cur.execute(f"UPDATE points SET total={temp}")
             
@@ -136,13 +123,28 @@ for key,habit in habits_st.items():
         count = sum(temp_counts.values())
 
         if habit["expander"].button('+',key=f'{habits[key]["name"]} add'):
-            cur.execute(f"SELECT count FROM counts WHERE habit_id = {key} AND date = '{dt.date.today()}'")
-            temp = float(cur.fetchone()[0]) + 1
-            cur.execute(f"""UPDATE counts SET count={temp}
+            
+            count_today = temp_counts[str(dt.date.today())]
+            cur.execute(f"""UPDATE counts SET count={count_today+1}
                 WHERE habit_id = {key} AND date = '{dt.date.today()}'""")
             
+            daily_goal = float(habits[key]["daily_goal"])
+            if daily_goal:
+                if daily_goal > count_today and daily_goal <= count_today + 1:
+                    daily_goal_points = weekly_points/(len(habits)*28)
+
+                normal_modifier = 2
+            else:
+                normal_modifier = 4/3
+           
+            weekly_goal = float(habits[key]["goal"])
+            if weekly_goal > count and weekly_goal <= count + 1:
+                weekly_goal_points = weekly_points/(len(habits)*4)
+            
             cur.execute(f"SELECT total FROM points")
-            temp = float(cur.fetchone()[0]) + weekly_points/(len(habits)*float(habits[key]["goal"]))
+            temp = float(cur.fetchone()[0]) + weekly_points/(len(habits)*weekly_goal*normal_modifier)\
+                + daily_goal_points + weekly_goal_points
+                
             cur.execute(f"UPDATE points SET total={temp}")
             
             save()
