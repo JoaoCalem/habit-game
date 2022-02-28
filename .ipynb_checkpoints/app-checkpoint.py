@@ -74,7 +74,7 @@ def trash():
 
 st.write("## Points:")
 
-st.write(f'### {round(points,2)}')
+st.write(f'### {points//1}')
 
 if habits:
     st.write("## Habits:")
