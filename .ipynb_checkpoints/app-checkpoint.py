@@ -201,9 +201,8 @@ for key,reward in rewards.items():
         reward_st["expander"].write(f'##### Available: {round(reward["count"],2)}')
         if reward["points"] <= reward["count"]:
             if reward_st["expander"].button(f"Use {reward['points']}", key=f'{key} use'):
-                cur.execute(f"SELECT total FROM points")
-                temp = float(cur.fetchone()[0]) - reward["points"]
-                cur.execute(f"UPDATE points SET total={temp}")
+                cur.execute(f"SELECT count FROM rewards WHERE id={key}")
+                cur.execute(f"UPDATE rewards SET count={float(cur.fetchone()[0]) - reward['points']} WHERE id={key}")
                 
                 save()
         else:
@@ -215,9 +214,9 @@ for key,reward in rewards.items():
         reward_st["expander"].write(f'##### Available: {round(reward["count"],2)}')
         if cost <= reward["count"]:
             if reward_st["expander"].button(f"Use {cost}", key=f'{key} use'):
-                cur.execute(f"SELECT total FROM points")
-                temp = float(cur.fetchone()[0]) - cost
-                cur.execute(f"UPDATE points SET total={temp}")
+                cur.execute(f"SELECT count FROM rewards WHERE id={key}")
+                cur.execute(f"UPDATE rewards SET count={float(cur.fetchone()[0]) - cost} WHERE id={key}")
+                
                 save()
         else:
             reward_st["expander"].write('Not enough')
