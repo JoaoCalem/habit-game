@@ -198,7 +198,7 @@ for key,reward in rewards.items():
     reward_st["expander"] = st.expander(reward['name'])
     
     if reward["type"] == "Count Based":
-        reward_st["expander"].write(f'##### Available: {round(reward["count"],2)}')
+        reward_st["expander"].write(f'##### Available: {round(reward["count"],2)} / {reward["points"]}')
         if reward["points"] <= reward["count"]:
             if reward_st["expander"].button(f"Use {reward['points']}", key=f'{key} use'):
                 cur.execute(f"SELECT count FROM rewards WHERE id={key}")
