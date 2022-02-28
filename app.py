@@ -36,7 +36,7 @@ cur.execute("SELECT * FROM habits")
 habits = {r[0]: {"name": r[1], "goal":r[2], "daily_goal":r[4], "type":r[3]} for r in cur.fetchall()}
 
 cur.execute("SELECT * FROM rewards")
-rewards = {r[0]: {"name": r[1],"points":r[2], "type":r[3]} for r in cur.fetchall()}
+rewards = {r[0]: {"name": r[1],"points":r[2], "type":r[3], "accum":r[4],"count":r[5]} for r in cur.fetchall()}
 
 cur.execute("SELECT * FROM counts")
 counts = cur.fetchall()
