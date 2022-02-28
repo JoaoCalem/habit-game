@@ -133,67 +133,42 @@ reward_sts = {key:{} for key in rewards.keys()}
 for key,reward in rewards.items():
     reward_st = reward_sts[key]
     reward["points"] = float(reward["points"])
+    reward_st["expander"] = st.expander(reward['name'])
     
     if reward["type"] == "Count Based":
-        reward_st["columns"] = st.columns([3.5,0.5,1])
-        reward_st["columns"][0].write(f"##### ")
-        reward_st["columns"][0].write(f"##### ")
-        reward_st["columns"][0].write(f"##### {reward['name']}")
-        reward_st["columns"][0].write(f"##### ")
-        reward_st["columns"][0].write(f"##### ")
-        reward_st["columns"][1].write(f"##### ")
-        reward_st["columns"][1].write(f"##### ")
-        reward_st["columns"][1].write(f'##### {reward["points"]}')
-        reward_st["columns"][1].write(f"##### ")
-        reward_st["columns"][1].write(f"##### ")
-        reward_st["columns"][2].write(f"##### ")
-        reward_st["columns"][2].write(f"##### ")
+        reward_st["expander"].write(f'##### {reward["points"]}')
         if reward["points"] <= points:
-            if reward_st["columns"][2].button("Use", key=f'{key} use'):
+            if reward_st["expander"].button("Use", key=f'{key} use'):
                 cur.execute(f"SELECT total FROM points")
                 temp = float(cur.fetchone()[0]) - reward["points"]
                 cur.execute(f"UPDATE points SET total={temp}")
                 
                 save()
         else:
-            reward_st["columns"][2].write('Not enough')
-        reward_st["columns"][2].write(f"##### ")
-        reward_st["columns"][2].write(f"##### ")
+            reward_st["expander"].write('Not enough')
     else:
-        reward_st["columns"] = st.columns([1.2,1.1,1.1,0.5,1])
-        reward_st["columns"][0].write(f"##### ")
-        reward_st["columns"][0].write(f"##### ")
-        reward_st["columns"][0].write(f"##### {reward['name']}")
-        reward_st["columns"][0].write(f"##### ")
-        reward_st["columns"][0].write(f"##### ")
-        reward_st["hours"] = reward_st["columns"][1].number_input('Hours', 0,key=f'{key} reward hours')
-        reward_st["minutes"] = reward_st["columns"][2].number_input('Minutes', 0, step=5,key=f'{key} reward minutes')
+        reward_st["hours"] = reward_st["expander"].number_input('Hours', 0,key=f'{key} reward hours')
+        reward_st["minutes"] = reward_st["expander"].number_input('Minutes', 0, step=5,key=f'{key} reward minutes')
         cost = round(reward["points"] * (reward_st["hours"]+reward_st["minutes"]/60),2)
-        reward_st["columns"][3].write(f"##### ")
-        reward_st["columns"][3].write(f"##### ")
-        reward_st["columns"][3].write(f'##### {cost}')
-        reward_st["columns"][3].write(f"##### ")
-        reward_st["columns"][3].write(f"##### ")
-        reward_st["columns"][4].write(f"##### ")
-        reward_st["columns"][4].write(f"##### ")
+        reward_st["expander"].write(f'##### {cost}')
         if cost <= points:
-            if reward_st["columns"][4].button("Use", key=f'{key} use'):
+            if reward_st["expander"].button("Use", key=f'{key} use'):
                 cur.execute(f"SELECT total FROM points")
                 temp = float(cur.fetchone()[0]) - cost
                 cur.execute(f"UPDATE points SET total={temp}")
                 save()
         else:
-            reward_st["columns"][4].write('Not enough')
-        reward_st["columns"][4].write(f"##### ")
-        reward_st["columns"][4].write(f"##### ")
+            reward_st["expander"].write('Not enough')
 
 st.write("## Add Habit:")
 
-new_habit = st.columns([1.8,1.1,1.1,1])
+name = st.text_input('Name', '')
 
-name = new_habit[0].text_input('Name', '')
+new_habit = st.columns([1.1,1.1,1.1,1])
 
-goal = new_habit[1].number_input('Weekly Goal', 0)
+goal = new_habit[0].number_input('Weekly Goal', 0)
+
+goal = new_habit[1].number_input('Daily Goal', 0)
 
 option = new_habit[2].selectbox('Type',["Time Based","Count Based"])
 
