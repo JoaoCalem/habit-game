@@ -1,4 +1,9 @@
 streamlit
 pandas
 psycopg2
+<<<<<<< HEAD
+matplotlib
+seaborn
+=======
 newrelic
+>>>>>>> 9e8b0bef6700855308232c7832c528dae41d0d0a
