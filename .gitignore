@@ -1,3 +1,5 @@
 .streamlit
 *.ipynb
 .ipynb_checkpoints
+**/*checkpoint.py
+.ipynb_checkpoints/app-checkpoint.py

@@ -24,12 +24,21 @@ def save():
     conn.commit()
     st.experimental_rerun()
 
-def update_points(points):
-    cur.execute(f"SELECT total FROM points")
-    cur.execute(f"UPDATE points SET total={float(cur.fetchone()[0]) + points}")
+def update_points(short,long):
+    cur.execute(f"SELECT total FROM points WHERE id=1")
+    cur.execute(f"UPDATE points SET total={float(cur.fetchone()[0]) + short} WHERE id=1")
+    
+    cur.execute(f"SELECT total FROM points WHERE id=2")
+    cur.execute(f"UPDATE points SET total={float(cur.fetchone()[0]) + long} WHERE id=2")
+    
     for reward in rewards.keys():
-        cur.execute(f"SELECT count FROM rewards WHERE id={reward}")
-        cur.execute(f"UPDATE rewards SET count={float(cur.fetchone()[0]) + points} WHERE id={reward}")
+        if rewards[reward]["term"] == "short":
+            cur.execute(f"SELECT count FROM rewards WHERE id={reward}")
+            cur.execute(f"UPDATE rewards SET count={float(cur.fetchone()[0]) + short} WHERE id={reward}")
+        
+        if rewards[reward]["term"] == "long":
+            cur.execute(f"SELECT count FROM rewards WHERE id={reward}")
+            cur.execute(f"UPDATE rewards SET count={float(cur.fetchone()[0]) + long} WHERE id={reward}")
     save()
     
     
@@ -37,25 +46,26 @@ conn = sql_connection()
 
 cur = conn.cursor()
     
-weekly_points = 100
+weekly_points = (70,30)
     
 cur.execute("SELECT * FROM points")
 
 start = dt.date.today() - dt.timedelta(days=dt.date.today().weekday())
-points_query = cur.fetchone()
-if str(start) != str(points_query[2]):
+points_query = cur.fetchall()
+if str(start) != str(points_query[0][2]):
     cur.execute(f"UPDATE points SET date='{start}'")
     cur.execute(f"UPDATE points SET total=0")
     cur.execute(f"DELETE FROM counts")
     save()
     
-points = points_query[1]
+short_points = points_query[0][1]
+long_points = points_query[1][1]
 
 cur.execute("SELECT * FROM habits")
 habits = {r[0]: {"name": r[1], "goal":r[2], "daily_goal":r[4], "type":r[3]} for r in cur.fetchall()}
 
 cur.execute("SELECT * FROM rewards")
-rewards = {r[0]: {"name": r[1],"points":r[2], "type":r[3], "accum":r[4],"count":r[5]} for r in cur.fetchall()}
+rewards = {r[0]: {"name": r[1],"points":r[2], "type":r[3], "accum":r[4],"count":r[5], "term":r[6]} for r in cur.fetchall()}
 
 cur.execute("SELECT * FROM counts")
 counts = cur.fetchall()
@@ -74,7 +84,7 @@ def trash():
 
 st.write("## Points:")
 
-st.write(f'### {points//1}')
+st.write(f'### {short_points//1}, {long_points//1}')
 
 if habits:
     st.write("## Habits:")
@@ -113,20 +123,19 @@ for key,habit in habits_st.items():
                 WHERE habit_id = {key} AND date = '{dt.date.today()}'""")
             
             daily_goal = float(habits[key]["daily_goal"])
+            modifier = 1
             if daily_goal:
                 if daily_goal > count_today and daily_goal <= temp/60:
-                    daily_goal_points = weekly_points/(len(habits)*28)
+                    daily_goal_points = weekly_points[1]/(len(habits)*14)
                     
-                normal_modifier = 2
-            else:
-                normal_modifier = 4/3
+                modifier = 2
            
             weekly_goal = float(habits[key]["goal"])
             if weekly_goal > count and weekly_goal <= count + int(mins)/60 + int(hours):
-                weekly_goal_points = weekly_points/(len(habits)*4)
+                weekly_goal_points = weekly_points[1]/(len(habits)*modifier)
             
-            update_points(weekly_points*(int(mins)/60 + int(hours))\
-                /(len(habits)*weekly_goal*normal_modifier) + daily_goal_points + weekly_goal_points)
+            update_points(weekly_points[0]*(int(mins)/60 + int(hours))\
+                /(len(habits)*weekly_goal), daily_goal_points + weekly_goal_points)
             
 
     else:
@@ -143,20 +152,19 @@ for key,habit in habits_st.items():
                 WHERE habit_id = {key} AND date = '{dt.date.today()}'""")
             
             daily_goal = float(habits[key]["daily_goal"])
+            modifier = 1
             if daily_goal:
                 if daily_goal > count_today and daily_goal <= count_today + 1:
-                    daily_goal_points = weekly_points/(len(habits)*28)
+                    daily_goal_points = weekly_points[1]/(len(habits)*14)
 
-                normal_modifier = 2
-            else:
-                normal_modifier = 4/3
+                modifier = 2
            
             weekly_goal = float(habits[key]["goal"])
             if weekly_goal > count and weekly_goal <= count + 1:
-                weekly_goal_points = weekly_points/(len(habits)*4)
+                weekly_goal_points = weekly_points[1]/(len(habits)*modifier)
             
-            update_points(weekly_points/(len(habits)*weekly_goal*normal_modifier)\
-                + daily_goal_points + weekly_goal_points)
+            update_points(weekly_points[0]/(len(habits)*weekly_goal),
+                daily_goal_points + weekly_goal_points)
     
     @st.cache(hash_funcs={matplotlib.figure.Figure: hash})
     def plot(temp_counts,habits):
@@ -211,7 +219,7 @@ for key,reward in rewards.items():
         reward_st["hours"] = reward_st["expander"].number_input('Hours', 0,key=f'{key} reward hours')
         reward_st["minutes"] = reward_st["expander"].number_input('Minutes', 0, step=5,key=f'{key} reward minutes')
         cost = round(reward["points"] * (reward_st["hours"]+reward_st["minutes"]/60),2)
-        reward_st["expander"].write(f'##### Available: {round(reward["count"],2)}')
+        reward_st["expander"].write(f'##### Available: {round(float(reward["count"])/reward["points"],1)} hours')
         if cost <= reward["count"]:
             if reward_st["expander"].button(f"Use {cost}", key=f'{key} use'):
                 cur.execute(f"SELECT count FROM rewards WHERE id={key}")
